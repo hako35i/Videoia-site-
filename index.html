@@ -156,6 +156,7 @@ generateBtn.addEventListener("click", async () => {
       },
       body: JSON.stringify({
         model: "agnes-video-2.5",
+        mode: "standard",
         prompt: promptInput.value.trim(),
         images: [imageBase64],
         aspect_ratio: formatInput.value
