@@ -97,13 +97,14 @@ footer{font-size:12px;color:#717b95;text-align:center;margin-top:26px}
   </section>
 
   <footer>
-    VideoIA · Connecté à Cloudflare & Agnes AI
+    VideoIA · Connexion directe Agnes AI
   </footer>
 </main>
 
 <script>
-// ⚠️ REMPLACE CETTE URL PAR L'URL EXACTE DE TON WORKER CLOUDFLARE (.workers.dev)
-const WORKER_URL = "https://fragrant-cake-916b.hakobrostreet.workers.dev";
+// Clé API intégrée directement
+const AGNES_API_KEY = "sk-QNiFgTJ9mtcvcxq77hGhm5xATHMYxlLpWBCkTj0u2cV2rYA3";
+const AGNES_API_URL = "https://apihub.agnes-ai.com/v1/videos";
 
 const imageInput = document.getElementById("image");
 const preview = document.getElementById("preview");
@@ -130,7 +131,7 @@ imageInput.addEventListener("change", () => {
   reader.readAsDataURL(file);
 });
 
-// Envoi vers le Worker Cloudflare lors du clic
+// Envoi direct vers l'API Agnes AI lors du clic
 generateBtn.addEventListener("click", async () => {
   if (!imageInput.files.length || !imageBase64) {
     statusBox.textContent = "Choisis d'abord une image.";
@@ -142,20 +143,21 @@ generateBtn.addEventListener("click", async () => {
     return;
   }
 
-  // Desactiver le bouton pendant le traitement
   generateBtn.disabled = true;
-  statusBox.textContent = "⏳ Génération en cours... Connexion à l'IA Agnes...";
+  statusBox.textContent = "⏳ Génération en cours... Connexion directe à Agnes AI...";
   videoResult.style.display = "none";
 
   try {
-    const response = await fetch(WORKER_URL, {
+    const response = await fetch(AGNES_API_URL, {
       method: "POST",
       headers: {
+        "Authorization": `Bearer ${AGNES_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        image_url: imageBase64,
+        model: "agnes-video-2.5",
         prompt: promptInput.value.trim(),
+        images: [imageBase64],
         aspect_ratio: formatInput.value
       })
     });
@@ -163,17 +165,17 @@ generateBtn.addEventListener("click", async () => {
     const data = await response.json();
 
     if (data.error) {
-      statusBox.textContent = "❌ Erreur : " + data.error;
+      statusBox.textContent = "❌ Erreur Agnes AI : " + (data.error.message || JSON.stringify(data.error));
     } else if (data.video_url || data.url) {
       statusBox.textContent = "✅ Vidéo générée avec succès !";
       videoResult.src = data.video_url || data.url;
       videoResult.style.display = "block";
     } else {
-      statusBox.textContent = "⚙️ Requête transmise à Agnes AI : " + JSON.stringify(data);
+      statusBox.textContent = "⚙️ Réponse d'Agnes AI : " + JSON.stringify(data);
     }
   } catch (err) {
     console.error(err);
-    statusBox.textContent = "❌ Erreur lors de la communication avec Cloudflare.";
+    statusBox.textContent = "❌ Erreur de connexion directe : " + err.message;
   } finally {
     generateBtn.disabled = false;
   }
