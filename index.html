@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -45,7 +44,9 @@ button{
   margin-top:18px;cursor:pointer;
 }
 button:active{opacity:.8}
+button:disabled{background:#374151;cursor:not-allowed}
 #status{font-size:14px;line-height:1.6;margin-top:15px;color:#c7d2fe}
+#videoResult{width:100%;margin-top:18px;border-radius:12px;display:none}
 footer{font-size:12px;color:#717b95;text-align:center;margin-top:26px}
 </style>
 </head>
@@ -61,7 +62,7 @@ footer{font-size:12px;color:#717b95;text-align:center;margin-top:26px}
 
   <div class="intro">Donne vie à tes photos.</div>
   <p class="muted">
-    Importe une image, décris les mouvements et prépare ta création vidéo.
+    Importe une image, décris les mouvements et génère ta vidéo avec l'IA Agnes.
   </p>
 
   <section class="card">
@@ -86,38 +87,52 @@ footer{font-size:12px;color:#717b95;text-align:center;margin-top:26px}
       <option value="1:1">Carré — 1:1</option>
     </select>
 
-    <button id="generate">Préparer ma vidéo IA</button>
+    <button id="generate">Générer ma vidéo IA</button>
     <div id="status" role="status">
       Prêt à commencer. Sélectionne une image.
     </div>
+
+    <!-- Emplacement pour la vidéo générée -->
+    <video id="videoResult" controls autoplay loop></video>
   </section>
 
   <footer>
-    VideoIA · Prototype web · La génération IA sera connectée dans une prochaine étape.
+    VideoIA · Connecté à Cloudflare & Agnes AI
   </footer>
 </main>
 
 <script>
+// ⚠️ REMPLACE CETTE URL PAR L'URL EXACTE DE TON WORKER CLOUDFLARE (.workers.dev)
+const WORKER_URL = "https://fragrant-cake-....hakobrostreet....workers.dev";
+
 const imageInput = document.getElementById("image");
 const preview = document.getElementById("preview");
 const promptInput = document.getElementById("prompt");
 const formatInput = document.getElementById("format");
+const generateBtn = document.getElementById("generate");
 const statusBox = document.getElementById("status");
-let imageUrl = null;
+const videoResult = document.getElementById("videoResult");
 
+let imageBase64 = null;
+
+// Convertir le fichier image sélectionné en base64
 imageInput.addEventListener("change", () => {
   const file = imageInput.files[0];
   if (!file) return;
 
-  if (imageUrl) URL.revokeObjectURL(imageUrl);
-  imageUrl = URL.createObjectURL(file);
-  preview.src = imageUrl;
-  preview.style.display = "block";
-  statusBox.textContent = "Image importée. Décris maintenant l'animation souhaitée.";
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    imageBase64 = e.target.result;
+    preview.src = imageBase64;
+    preview.style.display = "block";
+    statusBox.textContent = "Image importée. Décris maintenant l'animation souhaitée.";
+  };
+  reader.readAsDataURL(file);
 });
 
-document.getElementById("generate").addEventListener("click", () => {
-  if (!imageInput.files.length) {
+// Envoi vers le Worker Cloudflare lors du clic
+generateBtn.addEventListener("click", async () => {
+  if (!imageInput.files.length || !imageBase64) {
     statusBox.textContent = "Choisis d'abord une image.";
     return;
   }
@@ -127,8 +142,41 @@ document.getElementById("generate").addEventListener("click", () => {
     return;
   }
 
-  statusBox.textContent =
-    "Ta demande est prête ! Le moteur de génération vidéo IA n'est pas encore connecté. Cette étape sera ajoutée ensuite.";
+  // Desactiver le bouton pendant le traitement
+  generateBtn.disabled = true;
+  statusBox.textContent = "⏳ Génération en cours... Connexion à l'IA Agnes...";
+  videoResult.style.display = "none";
+
+  try {
+    const response = await fetch(WORKER_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        image_url: imageBase64,
+        prompt: promptInput.value.trim(),
+        aspect_ratio: formatInput.value
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      statusBox.textContent = "❌ Erreur : " + data.error;
+    } else if (data.video_url || data.url) {
+      statusBox.textContent = "✅ Vidéo générée avec succès !";
+      videoResult.src = data.video_url || data.url;
+      videoResult.style.display = "block";
+    } else {
+      statusBox.textContent = "⚙️ Requête transmise à Agnes AI : " + JSON.stringify(data);
+    }
+  } catch (err) {
+    console.error(err);
+    statusBox.textContent = "❌ Erreur lors de la communication avec Cloudflare.";
+  } finally {
+    generateBtn.disabled = false;
+  }
 });
 </script>
 </body>
